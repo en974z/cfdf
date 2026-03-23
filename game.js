@@ -60,22 +60,55 @@ class Projectile {
 }
 
 class Enemy {
-    constructor(x, y, radius, color, velocity) {
+    constructor(x, y, radius, color, velocity, type = 'circle') {
         this.x = x;
         this.y = y;
         this.radius = radius;
         this.color = color;
         this.velocity = velocity;
+        this.type = type;
+        
+        if (this.type === 'boss') {
+            this.maxHealth = 7;
+        } else {
+            this.maxHealth = Math.max(1, Math.ceil((this.radius - 10) / 10));
+        }
+        this.health = this.maxHealth;
     }
 
     draw() {
+        ctx.save();
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+        
+        if (this.type === 'circle') {
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+        } else if (this.type === 'boss') {
+            const sides = 6; // Hexagone tournoyant
+            ctx.translate(this.x, this.y);
+            ctx.rotate(Date.now() / 600); // Rotation sur lui-même
+            for (let i = 0; i < sides; i++) {
+                const px = this.radius * Math.cos(i * 2 * Math.PI / sides);
+                const py = this.radius * Math.sin(i * 2 * Math.PI / sides);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+        }
+        
         ctx.fillStyle = this.color;
         ctx.shadowBlur = 15;
         ctx.shadowColor = this.color;
         ctx.fill();
-        ctx.shadowBlur = 0;
+
+        if (this.type === 'boss' && this.health > 0) {
+            ctx.fillStyle = '#000000';
+            ctx.font = `bold ${this.radius}px Inter`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(this.health, 0, 0);
+        }
+
+        ctx.restore();
     }
 
     update() {
@@ -149,15 +182,25 @@ function spawnEnemies() {
         const angle = Math.atan2(canvas.height / 2 - y, canvas.width / 2 - x);
         
         // Plus un ennemi est petit, plus il est rapide. A mesure que le score monte, ils von plus vite.
-        const difficultyMultiplier = 1 + (score / 5000);
-        const speed = (1 + (30 / radius)) * difficultyMultiplier;
+        let difficultyMultiplier = 1 + (score / 5000);
+        let speed = (1 + (30 / radius)) * difficultyMultiplier;
+
+        let finalRadius = radius;
+        let type = 'circle';
+        
+        // 10% de chance de faire apparaître un immense BOSS (Hexagone), après un score de 200
+        if (Math.random() < 0.1 && score >= 200) { 
+            type = 'boss';
+            finalRadius = 55; // Immense
+            speed = speed * 0.4; // Beaucoup plus lent
+        }
 
         const velocity = {
             x: Math.cos(angle) * speed,
             y: Math.sin(angle) * speed
         };
 
-        enemies.push(new Enemy(x, y, radius, color, velocity));
+        enemies.push(new Enemy(x, y, finalRadius, color, velocity, type));
     }, 1000); 
 }
 
@@ -224,20 +267,26 @@ function animate() {
                     );
                 }
 
-                if (enemy.radius - 10 > 10) {
-                    // Réduit la taille de l'ennemi (il n'est pas mort)
+                enemy.health -= 1;
+
+                if (enemy.health > 0) {
+                    // L'ennemi n'est pas mort
                     score += 100;
                     scoreEl.innerHTML = score;
+                    
+                    const shrinkAmount = enemy.type === 'boss' ? (55 / 7) : 10;
                     gsap.to(enemy, {
-                        radius: enemy.radius - 10
+                        radius: Math.max(10, enemy.radius - shrinkAmount)
                     });
+                    
                     setTimeout(() => {
                         projectiles.splice(projectileIndex, 1);
                     }, 0);
                 } else {
                     // Supprime totalement l'ennemi
-                    score += 250;
+                    score += (enemy.type === 'boss' ? 1000 : 250);
                     scoreEl.innerHTML = score;
+                    
                     setTimeout(() => {
                         enemies.splice(index, 1);
                         projectiles.splice(projectileIndex, 1);
