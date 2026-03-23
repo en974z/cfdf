@@ -60,22 +60,37 @@ class Projectile {
 }
 
 class Enemy {
-    constructor(x, y, radius, color, velocity) {
+    constructor(x, y, radius, color, velocity, type = 'circle') {
         this.x = x;
         this.y = y;
         this.radius = radius;
         this.color = color;
         this.velocity = velocity;
+        this.type = type;
     }
 
     draw() {
+        ctx.save();
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+        
+        if (this.type === 'circle') {
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+        } else if (this.type === 'triangle') {
+            ctx.translate(this.x, this.y);
+            // Rotates the triangle to point towards the direction of movement
+            const angle = Math.atan2(this.velocity.y, this.velocity.x);
+            ctx.rotate(angle);
+            ctx.moveTo(this.radius * 1.5, 0); // Front point / Nose
+            ctx.lineTo(-this.radius, this.radius); // Bottom left point
+            ctx.lineTo(-this.radius, -this.radius); // Top left point
+            ctx.closePath();
+        }
+        
         ctx.fillStyle = this.color;
         ctx.shadowBlur = 15;
         ctx.shadowColor = this.color;
         ctx.fill();
-        ctx.shadowBlur = 0;
+        ctx.restore();
     }
 
     update() {
@@ -157,7 +172,8 @@ function spawnEnemies() {
             y: Math.sin(angle) * speed
         };
 
-        enemies.push(new Enemy(x, y, radius, color, velocity));
+        const type = Math.random() < 0.3 ? 'triangle' : 'circle';
+        enemies.push(new Enemy(x, y, radius, color, velocity, type));
     }, 1000); 
 }
 
